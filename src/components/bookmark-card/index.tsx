@@ -72,7 +72,11 @@ export function BookmarkCard({
   return (
     <article
       ref={setNodeRef}
-      className={classNames(styles.card, isDragging && styles.dragging)}
+      className={classNames(
+        styles.card,
+        site.isFavorite && styles.favoriteCard,
+        isDragging && styles.dragging,
+      )}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -108,7 +112,6 @@ export function BookmarkCard({
           </span>
           <span className={styles.info}>
             <span className={styles.title}>{site.title}</span>
-            <span className={styles.domain}>{site.domain}</span>
           </span>
         </button>
       </Tooltip>

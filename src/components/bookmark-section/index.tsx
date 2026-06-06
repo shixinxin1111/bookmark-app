@@ -1,4 +1,4 @@
-import { Button, Empty } from "@arco-design/web-react";
+import { Button } from "@arco-design/web-react";
 import {
   IconDelete,
   IconDragDotVertical,
@@ -6,7 +6,11 @@ import {
   IconPlus,
 } from "@arco-design/web-react/icon";
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BookmarkCard } from "@/components/bookmark-card";
 import type { BookmarkCategory, BookmarkSite } from "@/types/bookmark";
@@ -84,7 +88,7 @@ export function BookmarkSection({
               type="text"
             />
           )}
-          <div>
+          <div className={styles.heading}>
             <h2 className={styles.title}>{category.name}</h2>
             <span className={styles.count}>{category.sites.length} 个网站</span>
           </div>
@@ -134,24 +138,16 @@ export function BookmarkSection({
             />
           ))}
 
-          {category.sites.length === 0 ? (
-            <Empty
-              className={styles.empty}
-              description="这个分类还没有网站"
-            />
-          ) : null}
+          <button
+            className={styles.addSiteCard}
+            type="button"
+            onClick={() => onAddSite(category.id)}
+          >
+            <IconPlus />
+            添加网站
+          </button>
         </div>
       </SortableContext>
-
-      <Button
-        className={styles.addSite}
-        htmlType="button"
-        icon={<IconPlus />}
-        type="outline"
-        onClick={() => onAddSite(category.id)}
-      >
-        添加网站
-      </Button>
     </section>
   );
 }
