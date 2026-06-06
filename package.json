@@ -1,0 +1,63 @@
+{
+  "name": "bookmark-app",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && pnpm build:main && electron .\"",
+    "build:main": "tsc -p tsconfig.main.json",
+    "commitlint": "commitlint --edit",
+    "lint": "eslint .",
+    "format": "prettier . --write",
+    "lint-staged": "lint-staged",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "build": "pnpm build:main && vite build",
+    "dist:mac": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --config electron-builder.json --publish never",
+    "preview": "vite preview",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@arco-design/web-react": "^2.66.15",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.15.0",
+    "eslint": "^10.4.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
+    "prettier": "^3.8.3",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.60.1",
+    "vite": "^8.0.12",
+    "wait-on": "^9.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,html,json,jsonc,md,code-workspace}": [
+      "prettier --write"
+    ]
+  }
+}

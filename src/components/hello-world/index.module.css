@@ -1,0 +1,10 @@
+.hello {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #292620;
+  font-size: clamp(24px, 4vw, 44px);
+  font-weight: 760;
+  letter-spacing: -0.03em;
+}
