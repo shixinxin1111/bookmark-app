@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Form, Input, Message, Modal } from "@arco-design/web-react";
+import { Button, Form, Input, Message, Modal } from "@arco-design/web-react";
 import type { BookmarkFormValues } from "@/types/bookmark";
 import { getBookmarkMetadataApi, getErrorMessage } from "@/utils/api";
 import {
@@ -99,8 +99,7 @@ export function BookmarkFormModal({
     }
   }
 
-  async function handleSubmit() {
-    const values = await form.validate();
+  async function handleSubmit(values: BookmarkFormValues) {
     await onSubmit({
       logoUrl: values.logoUrl.trim(),
       title: values.title.trim(),
@@ -114,9 +113,13 @@ export function BookmarkFormModal({
       title={mode === "create" ? "添加网站" : "编辑网站"}
       visible={visible}
       onCancel={onCancel}
-      onOk={() => handleSubmit()}
+      onOk={() => form.submit()}
     >
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        onSubmit={(values) => void handleSubmit(values)}
+      >
         <Form.Item
           field="domain"
           label="网站域名"
@@ -127,12 +130,19 @@ export function BookmarkFormModal({
             },
           ]}
         >
-          <Input.Search
+          <Input
             allowClear
-            loading={fetchingMetadata}
+            addAfter={
+              <Button
+                htmlType="button"
+                loading={fetchingMetadata}
+                type="text"
+                onClick={() => void handleFetchMetadata()}
+              >
+                自动获取
+              </Button>
+            }
             placeholder="https://example.com"
-            searchButton="自动获取"
-            onSearch={() => void handleFetchMetadata()}
           />
         </Form.Item>
 

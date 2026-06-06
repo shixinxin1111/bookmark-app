@@ -35,8 +35,7 @@ export function CategoryFormModal({
     form.resetFields();
   }, [form, initialValues, visible]);
 
-  async function handleSubmit() {
-    const values = await form.validate();
+  async function handleSubmit(values: BookmarkCategoryFormValues) {
     await onSubmit({
       name: values.name.trim(),
     });
@@ -47,9 +46,13 @@ export function CategoryFormModal({
       title={mode === "create" ? "创建分类" : "编辑分类"}
       visible={visible}
       onCancel={onCancel}
-      onOk={() => handleSubmit()}
+      onOk={() => form.submit()}
     >
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        onSubmit={(values) => void handleSubmit(values)}
+      >
         <Form.Item
           field="name"
           label="分类名称"
