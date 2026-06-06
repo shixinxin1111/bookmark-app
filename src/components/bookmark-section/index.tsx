@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Button } from "@arco-design/web-react";
 import {
   IconDelete,
@@ -5,13 +6,8 @@ import {
   IconEdit,
   IconPlus,
 } from "@arco-design/web-react/icon";
-import { useDroppable } from "@dnd-kit/core";
-import {
-  SortableContext,
-  rectSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDroppable } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
 import { BookmarkCard } from "@/components/bookmark-card";
 import type { BookmarkCategory, BookmarkSite } from "@/types/bookmark";
 import { classNames } from "@/utils/class-name";
@@ -19,6 +15,7 @@ import styles from "./index.module.css";
 
 type BookmarkSectionProps = {
   category: BookmarkCategory;
+  categoryIndex: number;
   onAddSite(categoryId: string): void;
   onDeleteCategory(category: BookmarkCategory): void;
   onDeleteSite(categoryId: string, siteId: string): Promise<unknown> | void;
@@ -35,6 +32,7 @@ type BookmarkSectionProps = {
  */
 export function BookmarkSection({
   category,
+  categoryIndex,
   onAddSite,
   onDeleteCategory,
   onDeleteSite,
@@ -43,47 +41,55 @@ export function BookmarkSection({
   onToggleSiteFavorite,
 }: BookmarkSectionProps) {
   const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
+    handleRef,
     isDragging,
+    ref: categoryRef,
   } = useSortable({
-    id: `category:${category.id}`,
+    accept: "category",
     data: {
       categoryId: category.id,
       kind: "category",
     },
     disabled: category.isDefault,
+    group: "categories",
+    id: `category:${category.id}`,
+    index: categoryIndex,
+    transition: {
+      duration: 220,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    },
+    type: "category",
   });
-  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: `category-drop:${category.id}`,
+  const { isDropTarget, ref: categoryDropRef } = useDroppable({
+    accept: "site",
     data: {
       categoryId: category.id,
       kind: "category-drop",
     },
+    id: `category-drop:${category.id}`,
   });
+  const setSectionRef = useCallback(
+    (element: HTMLElement | null) => {
+      categoryRef(element);
+      categoryDropRef(element);
+    },
+    [categoryDropRef, categoryRef],
+  );
 
   return (
     <section
-      ref={setNodeRef}
+      ref={setSectionRef}
       className={classNames(styles.section, isDragging && styles.dragging)}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
     >
       <header className={styles.header}>
         <div className={styles.titleWrap}>
           {category.isDefault ? null : (
             <Button
-              {...attributes}
-              {...listeners}
               aria-label={`拖拽排序 ${category.name}`}
               className={styles.dragHandle}
               htmlType="button"
               icon={<IconDragDotVertical />}
+              ref={handleRef}
               size="mini"
               type="text"
             />
@@ -94,60 +100,55 @@ export function BookmarkSection({
           </div>
         </div>
 
-        {category.isDefault ? null : (
-          <div className={styles.actions}>
-            <Button
-              htmlType="button"
-              icon={<IconEdit />}
-              size="mini"
-              type="text"
-              onClick={() => onEditCategory(category)}
-            >
-              编辑
-            </Button>
-            <Button
-              htmlType="button"
-              icon={<IconDelete />}
-              size="mini"
-              status="danger"
-              type="text"
-              onClick={() => onDeleteCategory(category)}
-            >
-              删除
-            </Button>
-          </div>
-        )}
-      </header>
-
-      <SortableContext
-        items={category.sites.map((site) => `site:${category.id}:${site.id}`)}
-        strategy={rectSortingStrategy}
-      >
-        <div
-          ref={setDroppableRef}
-          className={classNames(styles.grid, isOver && styles.gridOver)}
-        >
-          {category.sites.map((site) => (
-            <BookmarkCard
-              categoryId={category.id}
-              key={site.id}
-              site={site}
-              onDelete={() => onDeleteSite(category.id, site.id)}
-              onEdit={() => onEditSite(category, site)}
-              onToggleFavorite={() => onToggleSiteFavorite(category.id, site.id)}
-            />
-          ))}
-
-          <button
-            className={styles.addSiteCard}
-            type="button"
+        <div className={styles.actions}>
+          <Button
+            htmlType="button"
+            icon={<IconPlus />}
+            size="mini"
+            type="text"
             onClick={() => onAddSite(category.id)}
           >
-            <IconPlus />
             添加网站
-          </button>
+          </Button>
+          {category.isDefault ? null : (
+            <>
+              <Button
+                htmlType="button"
+                icon={<IconEdit />}
+                size="mini"
+                type="text"
+                onClick={() => onEditCategory(category)}
+              >
+                编辑
+              </Button>
+              <Button
+                htmlType="button"
+                icon={<IconDelete />}
+                size="mini"
+                status="danger"
+                type="text"
+                onClick={() => onDeleteCategory(category)}
+              >
+                删除
+              </Button>
+            </>
+          )}
         </div>
-      </SortableContext>
+      </header>
+
+      <div className={classNames(styles.grid, isDropTarget && styles.gridOver)}>
+        {category.sites.map((site, siteIndex) => (
+          <BookmarkCard
+            categoryId={category.id}
+            key={site.id}
+            site={site}
+            siteIndex={siteIndex}
+            onDelete={() => onDeleteSite(category.id, site.id)}
+            onEdit={() => onEditSite(category, site)}
+            onToggleFavorite={() => onToggleSiteFavorite(category.id, site.id)}
+          />
+        ))}
+      </div>
     </section>
   );
 }

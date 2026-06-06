@@ -7,8 +7,7 @@ import {
   IconStar,
   IconStarFill,
 } from "@arco-design/web-react/icon";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useSortable } from "@dnd-kit/react/sortable";
 import type { BookmarkSite } from "@/types/bookmark";
 import { getBookmarkLinkApi, getErrorMessage } from "@/utils/api";
 import { getLogoFallback } from "@/utils/bookmark-url";
@@ -18,6 +17,7 @@ import styles from "./index.module.css";
 type BookmarkCardProps = {
   categoryId: string;
   site: BookmarkSite;
+  siteIndex: number;
   onDelete(): Promise<unknown> | void;
   onEdit(): void;
   onToggleFavorite(): Promise<unknown> | void;
@@ -29,20 +29,28 @@ type BookmarkCardProps = {
 export function BookmarkCard({
   categoryId,
   site,
+  siteIndex,
   onDelete,
   onEdit,
   onToggleFavorite,
 }: BookmarkCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: `site:${categoryId}:${site.id}`,
-      data: {
-        categoryId,
-        kind: "site",
-        siteId: site.id,
-      },
-    });
+  const { handleRef, isDragging, ref } = useSortable({
+    accept: "site",
+    data: {
+      categoryId,
+      kind: "site",
+      siteId: site.id,
+    },
+    group: categoryId,
+    id: `site:${categoryId}:${site.id}`,
+    index: siteIndex,
+    transition: {
+      duration: 220,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    },
+    type: "site",
+  });
 
   async function handleOpenSite() {
     const bookmarkLink = getBookmarkLinkApi();
@@ -61,24 +69,19 @@ export function BookmarkCard({
 
   return (
     <article
-      ref={setNodeRef}
+      ref={ref}
       className={classNames(
         styles.card,
         site.isFavorite && styles.favoriteCard,
         isDragging && styles.dragging,
       )}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
     >
       <Button
-        {...attributes}
-        {...listeners}
         aria-label={`拖拽排序 ${site.title}`}
         className={styles.dragHandle}
         htmlType="button"
         icon={<IconDragDotVertical />}
+        ref={handleRef}
         size="mini"
         type="text"
       />

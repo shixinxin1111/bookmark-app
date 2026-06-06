@@ -1,19 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button, Modal, Spin } from "@arco-design/web-react";
 import { IconFolderAdd, IconLink, IconStar } from "@arco-design/web-react/icon";
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
 import { BookmarkFormModal } from "@/components/bookmark-form-modal";
 import { BookmarkSection } from "@/components/bookmark-section";
 import { CategoryFormModal } from "@/components/category-form-modal";
@@ -85,17 +73,15 @@ type DeleteSiteState = {
   site: BookmarkSite;
 };
 
+type DragData =
+  | { kind: "category"; categoryId: string }
+  | { kind: "category-drop"; categoryId: string }
+  | { kind: "site"; categoryId: string; siteId: string };
+
 function getDragData(event: DragEndEvent) {
   return {
-    active: event.active.data.current as
-      | { kind: "category"; categoryId: string }
-      | { kind: "site"; categoryId: string; siteId: string }
-      | undefined,
-    over: event.over?.data.current as
-      | { kind: "category"; categoryId: string }
-      | { kind: "category-drop"; categoryId: string }
-      | { kind: "site"; categoryId: string; siteId: string }
-      | undefined,
+    active: event.operation.source?.data as DragData | undefined,
+    over: event.operation.target?.data as DragData | undefined,
   };
 }
 
@@ -121,14 +107,6 @@ export function BookmarkManager({
   const [deleteCategoryTarget, setDeleteCategoryTarget] =
     useState<BookmarkCategory>();
   const [deleteSiteTarget, setDeleteSiteTarget] = useState<DeleteSiteState>();
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 6,
-      },
-    }),
-    useSensor(KeyboardSensor),
-  );
   const siteCount = useMemo(
     () =>
       categories.reduce((count, category) => count + category.sites.length, 0),
@@ -138,32 +116,48 @@ export function BookmarkManager({
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = getDragData(event);
 
-    if (!active || !over || event.active.id === event.over?.id) {
+    if (!active || !over || event.canceled) {
       return;
     }
+
+    if (event.operation.source?.id === event.operation.target?.id) {
+      return;
+    }
+
+    const transition = event.suspend();
 
     if (active.kind === "category" && over.kind === "category") {
-      await moveCategory(active.categoryId, over.categoryId);
-      return;
-    }
-
-    if (active.kind !== "site") {
-      return;
-    }
-
-    if (over.kind === "site") {
-      await moveSite(
-        active.siteId,
-        active.categoryId,
-        over.categoryId,
-        over.siteId,
+      void moveCategory(active.categoryId, over.categoryId).then(
+        transition.resume,
+        transition.abort,
       );
       return;
     }
 
-    if (over.kind === "category-drop") {
-      await moveSite(active.siteId, active.categoryId, over.categoryId);
+    if (active.kind !== "site") {
+      transition.abort();
+      return;
     }
+
+    if (over.kind === "site") {
+      void moveSite(
+        active.siteId,
+        active.categoryId,
+        over.categoryId,
+        over.siteId,
+      ).then(transition.resume, transition.abort);
+      return;
+    }
+
+    if (over.kind === "category-drop") {
+      void moveSite(active.siteId, active.categoryId, over.categoryId).then(
+        transition.resume,
+        transition.abort,
+      );
+      return;
+    }
+
+    transition.abort();
   }
 
   async function handleCategorySubmit(values: BookmarkCategoryFormValues) {
@@ -243,52 +237,44 @@ export function BookmarkManager({
       </header>
 
       <Spin block loading={loading} className={styles.body}>
-        <DndContext
-          collisionDetection={closestCenter}
-          sensors={sensors}
-          onDragEnd={(event) => void handleDragEnd(event)}
-        >
-          <SortableContext
-            items={categories.map((category) => `category:${category.id}`)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className={styles.sections}>
-              {categories.map((category) => (
-                <BookmarkSection
-                  category={category}
-                  key={category.id}
-                  onAddSite={(categoryId) =>
-                    setSiteModal({ mode: "create", categoryId })
-                  }
-                  onDeleteCategory={setDeleteCategoryTarget}
-                  onDeleteSite={(categoryId, siteId) => {
-                    const site = category.sites.find(
-                      (candidate) => candidate.id === siteId,
-                    );
+        <DragDropProvider onDragEnd={(event) => void handleDragEnd(event)}>
+          <div className={styles.sections}>
+            {categories.map((category, categoryIndex) => (
+              <BookmarkSection
+                category={category}
+                categoryIndex={categoryIndex}
+                key={category.id}
+                onAddSite={(categoryId) =>
+                  setSiteModal({ mode: "create", categoryId })
+                }
+                onDeleteCategory={setDeleteCategoryTarget}
+                onDeleteSite={(categoryId, siteId) => {
+                  const site = category.sites.find(
+                    (candidate) => candidate.id === siteId,
+                  );
 
-                    if (site) {
-                      setDeleteSiteTarget({ categoryId, site });
-                    }
-                  }}
-                  onEditCategory={(nextCategory) =>
-                    setCategoryModal({
-                      mode: "edit",
-                      category: nextCategory,
-                    })
+                  if (site) {
+                    setDeleteSiteTarget({ categoryId, site });
                   }
-                  onEditSite={(nextCategory, site) =>
-                    setSiteModal({
-                      mode: "edit",
-                      categoryId: nextCategory.id,
-                      site,
-                    })
-                  }
-                  onToggleSiteFavorite={toggleSiteFavorite}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+                }}
+                onEditCategory={(nextCategory) =>
+                  setCategoryModal({
+                    mode: "edit",
+                    category: nextCategory,
+                  })
+                }
+                onEditSite={(nextCategory, site) =>
+                  setSiteModal({
+                    mode: "edit",
+                    categoryId: nextCategory.id,
+                    site,
+                  })
+                }
+                onToggleSiteFavorite={toggleSiteFavorite}
+              />
+            ))}
+          </div>
+        </DragDropProvider>
       </Spin>
 
       <Button
