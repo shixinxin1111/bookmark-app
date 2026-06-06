@@ -22,7 +22,10 @@ const defaultValues: BookmarkFormValues = {
   note: "",
 };
 
-function validateOptionalUrl(value: string | undefined, callback: (error?: string) => void) {
+function validateOptionalUrl(
+  value: string | undefined,
+  callback: (error?: string) => void,
+) {
   if (value && !isValidBookmarkUrl(value)) {
     callback("请输入有效的 http/https 链接");
     return;
@@ -31,7 +34,10 @@ function validateOptionalUrl(value: string | undefined, callback: (error?: strin
   callback();
 }
 
-function validateRequiredUrl(value: string | undefined, callback: (error?: string) => void) {
+function validateRequiredUrl(
+  value: string | undefined,
+  callback: (error?: string) => void,
+) {
   if (!value?.trim()) {
     callback("请输入网站域名");
     return;
@@ -186,6 +192,21 @@ export function BookmarkFormModal({
             showWordLimit
           />
         </Form.Item>
+
+        <button
+          aria-hidden="true"
+          tabIndex={-1}
+          type="submit"
+          style={{
+            border: 0,
+            height: 0,
+            opacity: 0,
+            overflow: "hidden",
+            padding: 0,
+            position: "absolute",
+            width: 0,
+          }}
+        />
       </Form>
     </Modal>
   );
