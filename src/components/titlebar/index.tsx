@@ -12,6 +12,7 @@ type TitlebarProps = {
   isBusy: boolean;
   isFloating: boolean;
   isFloatingCollapsed: boolean;
+  metric?: string;
   onWindowModeChange(mode: BookmarkWindowMode): void;
   windowMode: BookmarkWindowMode;
 };
@@ -25,6 +26,7 @@ export function Titlebar({
   isBusy,
   isFloating,
   isFloatingCollapsed,
+  metric,
   onWindowModeChange,
   windowMode,
 }: TitlebarProps) {
@@ -52,7 +54,7 @@ export function Titlebar({
         <IconLink className={styles.brandIcon} aria-hidden="true" />
         Bookmark
         {isFloatingCollapsed ? (
-          <span className={styles.metric}>Hello World</span>
+          <span className={styles.metric}>{metric ?? "0 个网址"}</span>
         ) : null}
       </span>
 

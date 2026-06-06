@@ -5,12 +5,19 @@ import {
   Menu,
   nativeImage,
   screen,
+  shell,
   Tray,
   type Display,
   type Rectangle,
 } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import {
+  createBookmarkStore,
+  type BookmarkCategoryInput,
+  type BookmarkSiteInput,
+} from "./bookmarkStore.js";
+import { fetchBookmarkMetadata } from "./bookmarkMetadata.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rendererUrl = process.env.VITE_DEV_SERVER_URL ?? "http://127.0.0.1:5173";
@@ -172,6 +179,87 @@ function registerWindowIpc() {
   );
 }
 
+function registerBookmarkStoreIpc() {
+  const bookmarkStore = createBookmarkStore(
+    path.join(app.getPath("userData"), "bookmarks.json"),
+  );
+
+  ipcMain.handle("bookmark-store:list", () => bookmarkStore.list());
+  ipcMain.handle(
+    "bookmark-store:create-category",
+    (_, input: BookmarkCategoryInput) => bookmarkStore.createCategory(input),
+  );
+  ipcMain.handle(
+    "bookmark-store:update-category",
+    (_, categoryId: string, input: BookmarkCategoryInput) =>
+      bookmarkStore.updateCategory(categoryId, input),
+  );
+  ipcMain.handle(
+    "bookmark-store:delete-category",
+    (_, categoryId: string, deleteSites: boolean) =>
+      bookmarkStore.deleteCategory(categoryId, deleteSites),
+  );
+  ipcMain.handle(
+    "bookmark-store:create-site",
+    (_, categoryId: string, input: BookmarkSiteInput) =>
+      bookmarkStore.createSite(categoryId, input),
+  );
+  ipcMain.handle(
+    "bookmark-store:update-site",
+    (_, categoryId: string, siteId: string, input: BookmarkSiteInput) =>
+      bookmarkStore.updateSite(categoryId, siteId, input),
+  );
+  ipcMain.handle(
+    "bookmark-store:delete-site",
+    (_, categoryId: string, siteId: string) =>
+      bookmarkStore.deleteSite(categoryId, siteId),
+  );
+  ipcMain.handle(
+    "bookmark-store:toggle-site-favorite",
+    (_, categoryId: string, siteId: string) =>
+      bookmarkStore.toggleSiteFavorite(categoryId, siteId),
+  );
+  ipcMain.handle(
+    "bookmark-store:move-category",
+    (_, activeCategoryId: string, overCategoryId: string) =>
+      bookmarkStore.moveCategory(activeCategoryId, overCategoryId),
+  );
+  ipcMain.handle(
+    "bookmark-store:move-site",
+    (
+      _,
+      activeSiteId: string,
+      fromCategoryId: string,
+      toCategoryId: string,
+      overSiteId?: string,
+    ) =>
+      bookmarkStore.moveSite(
+        activeSiteId,
+        fromCategoryId,
+        toCategoryId,
+        overSiteId,
+      ),
+  );
+}
+
+function registerBookmarkMetadataIpc() {
+  ipcMain.handle("bookmark-metadata:fetch", (_, domain: string) =>
+    fetchBookmarkMetadata(domain),
+  );
+}
+
+function registerLinkIpc() {
+  ipcMain.handle("bookmark-link:open-external", async (_, urlValue: string) => {
+    const url = new URL(urlValue);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("只支持打开 http/https 链接。");
+    }
+
+    await shell.openExternal(url.toString());
+  });
+}
+
 function createTray() {
   if (tray) {
     return tray;
@@ -264,6 +352,9 @@ function createMainWindow() {
 
 app.whenReady().then(() => {
   registerWindowIpc();
+  registerBookmarkStoreIpc();
+  registerBookmarkMetadataIpc();
+  registerLinkIpc();
   createMainWindow();
 
   app.on("activate", () => {

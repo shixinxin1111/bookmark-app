@@ -1,0 +1,94 @@
+.section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(49, 45, 38, 0.1);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.66)),
+    rgba(255, 255, 255, 0.68);
+  box-shadow: 0 14px 36px rgba(45, 41, 34, 0.08);
+  -webkit-app-region: no-drag;
+}
+
+.dragging {
+  z-index: 2;
+  opacity: 0.76;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titleWrap {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.dragHandle {
+  color: rgba(47, 44, 37, 0.45);
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.title {
+  margin: 0;
+  color: #292620;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.count {
+  display: inline-block;
+  margin-top: 2px;
+  color: rgba(47, 44, 37, 0.52);
+  font-size: 12px;
+}
+
+.actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  min-height: 106px;
+  padding: 6px;
+  border: 1px dashed transparent;
+  border-radius: 18px;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.gridOver {
+  border-color: rgba(114, 46, 209, 0.3);
+  background: rgba(114, 46, 209, 0.04);
+}
+
+.empty {
+  grid-column: 1 / -1;
+  margin: 8px 0;
+}
+
+.addSite {
+  justify-self: start;
+}
+
+@media (max-width: 720px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

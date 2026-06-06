@@ -9,6 +9,27 @@ export function getBookmarkWindowApi() {
 }
 
 /**
+ * getBookmarkStoreApi 读取 preload 暴露的书签持久化 API。
+ */
+export function getBookmarkStoreApi() {
+  return window.bookmarkStore;
+}
+
+/**
+ * getBookmarkMetadataApi 读取 preload 暴露的网址信息读取 API。
+ */
+export function getBookmarkMetadataApi() {
+  return window.bookmarkMetadata;
+}
+
+/**
+ * getBookmarkLinkApi 读取 preload 暴露的外部链接打开 API。
+ */
+export function getBookmarkLinkApi() {
+  return window.bookmarkLink;
+}
+
+/**
  * getErrorMessage 将未知错误转换为用户可展示的兜底文案。
  *
  * 只有标准 Error 且 message 非空时才透出原始信息，否则返回调用方提供的
