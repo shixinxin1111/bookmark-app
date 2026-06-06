@@ -29,18 +29,35 @@ type BookmarkManagerProps = {
   categories: BookmarkCategory[];
   favoriteCount: number;
   loading: boolean;
-  createCategory(values: BookmarkCategoryFormValues): Promise<BookmarkCategory[] | undefined>;
-  createSite(categoryId: string, values: BookmarkFormValues): Promise<BookmarkCategory[] | undefined>;
-  deleteCategory(categoryId: string, deleteSites: boolean): Promise<BookmarkCategory[] | undefined>;
-  deleteSite(categoryId: string, siteId: string): Promise<BookmarkCategory[] | undefined>;
-  moveCategory(activeCategoryId: string, overCategoryId: string): Promise<BookmarkCategory[] | undefined>;
+  createCategory(
+    values: BookmarkCategoryFormValues,
+  ): Promise<BookmarkCategory[] | undefined>;
+  createSite(
+    categoryId: string,
+    values: BookmarkFormValues,
+  ): Promise<BookmarkCategory[] | undefined>;
+  deleteCategory(
+    categoryId: string,
+    deleteSites: boolean,
+  ): Promise<BookmarkCategory[] | undefined>;
+  deleteSite(
+    categoryId: string,
+    siteId: string,
+  ): Promise<BookmarkCategory[] | undefined>;
+  moveCategory(
+    activeCategoryId: string,
+    overCategoryId: string,
+  ): Promise<BookmarkCategory[] | undefined>;
   moveSite(
     activeSiteId: string,
     fromCategoryId: string,
     toCategoryId: string,
     overSiteId?: string,
   ): Promise<BookmarkCategory[] | undefined>;
-  toggleSiteFavorite(categoryId: string, siteId: string): Promise<BookmarkCategory[] | undefined>;
+  toggleSiteFavorite(
+    categoryId: string,
+    siteId: string,
+  ): Promise<BookmarkCategory[] | undefined>;
   updateCategory(
     categoryId: string,
     values: BookmarkCategoryFormValues,
@@ -129,7 +146,12 @@ export function BookmarkManager({
     }
 
     if (over.kind === "site") {
-      await moveSite(active.siteId, active.categoryId, over.categoryId, over.siteId);
+      await moveSite(
+        active.siteId,
+        active.categoryId,
+        over.categoryId,
+        over.siteId,
+      );
       return;
     }
 
@@ -177,12 +199,8 @@ export function BookmarkManager({
   return (
     <div className={styles.manager}>
       <header className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>Bookmark Library</p>
+        <div className={styles.heading}>
           <h1 className={styles.title}>书签管理</h1>
-          <p className={styles.description}>
-            按分类整理网站，收藏后会同步展示到悬浮窗。
-          </p>
         </div>
 
         <div className={styles.stats}>
@@ -203,7 +221,7 @@ export function BookmarkManager({
         </div>
       </header>
 
-      <Spin loading={loading} className={styles.body}>
+      <Spin block loading={loading} className={styles.body}>
         <DndContext
           collisionDetection={closestCenter}
           sensors={sensors}

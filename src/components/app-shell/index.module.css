@@ -68,7 +68,7 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 18px clamp(20px, 4vw, 56px) 22px;
+  padding: 0;
 }
 
 .floating .contentInner {
@@ -77,7 +77,6 @@
 
 @media (max-width: 760px) {
   .contentInner {
-    padding-right: 16px;
-    padding-left: 16px;
+    padding: 0;
   }
 }
