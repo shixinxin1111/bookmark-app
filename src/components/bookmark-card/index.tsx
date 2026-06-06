@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Message, Modal, Tooltip } from "@arco-design/web-react";
+import { Button, Message, Tooltip } from "@arco-design/web-react";
 import {
   IconDelete,
   IconDragDotVertical,
@@ -57,16 +57,6 @@ export function BookmarkCard({
     } catch (error) {
       Message.error(getErrorMessage(error, "网站打开失败。"));
     }
-  }
-
-  function handleDelete() {
-    Modal.confirm({
-      title: "删除网站",
-      content: `确认删除「${site.title}」吗？`,
-      okText: "确认删除",
-      cancelText: "取消",
-      onOk: () => onDelete(),
-    });
   }
 
   return (
@@ -141,7 +131,15 @@ export function BookmarkCard({
           size="mini"
           status="danger"
           type="text"
-          onClick={handleDelete}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void onDelete();
+          }}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
         />
       </div>
     </article>

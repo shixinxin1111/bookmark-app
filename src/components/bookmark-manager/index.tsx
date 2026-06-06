@@ -80,6 +80,11 @@ type SiteModalState = {
   site?: BookmarkSite;
 };
 
+type DeleteSiteState = {
+  categoryId: string;
+  site: BookmarkSite;
+};
+
 function getDragData(event: DragEndEvent) {
   return {
     active: event.active.data.current as
@@ -115,6 +120,7 @@ export function BookmarkManager({
   const [siteModal, setSiteModal] = useState<SiteModalState>();
   const [deleteCategoryTarget, setDeleteCategoryTarget] =
     useState<BookmarkCategory>();
+  const [deleteSiteTarget, setDeleteSiteTarget] = useState<DeleteSiteState>();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -196,6 +202,21 @@ export function BookmarkManager({
     }
   }
 
+  async function handleDeleteSite() {
+    if (!deleteSiteTarget) {
+      return;
+    }
+
+    const result = await deleteSite(
+      deleteSiteTarget.categoryId,
+      deleteSiteTarget.site.id,
+    );
+
+    if (result) {
+      setDeleteSiteTarget(undefined);
+    }
+  }
+
   return (
     <div className={styles.manager}>
       <header className={styles.hero}>
@@ -240,7 +261,15 @@ export function BookmarkManager({
                     setSiteModal({ mode: "create", categoryId })
                   }
                   onDeleteCategory={setDeleteCategoryTarget}
-                  onDeleteSite={deleteSite}
+                  onDeleteSite={(categoryId, siteId) => {
+                    const site = category.sites.find(
+                      (candidate) => candidate.id === siteId,
+                    );
+
+                    if (site) {
+                      setDeleteSiteTarget({ categoryId, site });
+                    }
+                  }}
                   onEditCategory={(nextCategory) =>
                     setCategoryModal({
                       mode: "edit",
@@ -325,6 +354,26 @@ export function BookmarkManager({
       >
         删除「{deleteCategoryTarget?.name}」后，可以选择把子网站移动到未分类，
         或一起删除。
+      </Modal>
+
+      <Modal
+        title="删除网站"
+        visible={Boolean(deleteSiteTarget)}
+        footer={
+          <div className={styles.deleteFooter}>
+            <Button onClick={() => setDeleteSiteTarget(undefined)}>取消</Button>
+            <Button
+              status="danger"
+              type="primary"
+              onClick={() => void handleDeleteSite()}
+            >
+              确认删除
+            </Button>
+          </div>
+        }
+        onCancel={() => setDeleteSiteTarget(undefined)}
+      >
+        确认删除「{deleteSiteTarget?.site.title}」吗？
       </Modal>
     </div>
   );
