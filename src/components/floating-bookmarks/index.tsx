@@ -8,6 +8,14 @@ type FloatingBookmarksProps = {
   favoriteSites: BookmarkSite[];
 };
 
+function getDisplayDomain(domain: string) {
+  try {
+    return new URL(domain).hostname.replace(/^www\./, "");
+  } catch {
+    return domain.replace(/^https?:\/\//, "").replace(/^www\./, "");
+  }
+}
+
 /**
  * FloatingBookmarks 渲染悬浮窗中的收藏网站平铺列表。
  */
@@ -52,7 +60,12 @@ export function FloatingBookmarks({ favoriteSites }: FloatingBookmarksProps) {
               getLogoFallback(site.title, site.domain)
             )}
           </span>
-          <span className={styles.title}>{site.title}</span>
+          <span className={styles.content}>
+            <span className={styles.title}>{site.title}</span>
+            <span className={styles.domain}>
+              {getDisplayDomain(site.domain)}
+            </span>
+          </span>
         </button>
       ))}
     </div>
