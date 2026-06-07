@@ -1,35 +1,54 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="background" x1="148" y1="116" x2="876" y2="916" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fbf7ef" />
-      <stop offset="1" stop-color="#eadfff" />
+    <linearGradient id="app-bg" x1="132" y1="108" x2="888" y2="916" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff8e6" />
+      <stop offset="0.52" stop-color="#f4edff" />
+      <stop offset="1" stop-color="#e9f5ff" />
     </linearGradient>
-    <linearGradient id="mark" x1="296" y1="228" x2="738" y2="778" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#9b5cff" />
-      <stop offset="0.58" stop-color="#6f3df4" />
-      <stop offset="1" stop-color="#3b82f6" />
+    <linearGradient id="bookmark-fill" x1="326" y1="206" x2="716" y2="802" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6" />
+      <stop offset="0.56" stop-color="#6d5dfc" />
+      <stop offset="1" stop-color="#2563eb" />
     </linearGradient>
-    <filter id="soft-shadow" x="120" y="120" width="784" height="784" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="28" stdDeviation="34" flood-color="#4f2bbd" flood-opacity="0.22" />
+    <linearGradient id="bookmark-fold" x1="402" y1="322" x2="640" y2="812" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.97" />
+      <stop offset="1" stop-color="#fdf7df" stop-opacity="0.95" />
+    </linearGradient>
+    <linearGradient id="link-fill" x1="316" y1="402" x2="708" y2="628" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f59e0b" />
+      <stop offset="1" stop-color="#f97316" />
+    </linearGradient>
+    <filter id="card-shadow" x="172" y="128" width="680" height="760" filterUnits="userSpaceOnUse"
+      color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="30" stdDeviation="38" flood-color="#4338ca" flood-opacity="0.24" />
+    </filter>
+    <filter id="link-shadow" x="224" y="314" width="576" height="404" filterUnits="userSpaceOnUse"
+      color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#9a3412" flood-opacity="0.24" />
     </filter>
   </defs>
 
-  <rect width="1024" height="1024" rx="232" fill="url(#background)" />
-  <circle cx="238" cy="222" r="96" fill="#ffffff" opacity="0.62" />
-  <circle cx="812" cy="812" r="148" fill="#ffffff" opacity="0.42" />
+  <rect width="1024" height="1024" rx="228" fill="url(#app-bg)" />
+  <circle cx="220" cy="222" r="118" fill="#ffffff" opacity="0.62" />
+  <circle cx="814" cy="786" r="154" fill="#ffffff" opacity="0.46" />
+  <circle cx="812" cy="206" r="54" fill="#fef3c7" opacity="0.8" />
 
-  <g filter="url(#soft-shadow)">
-    <rect x="246" y="202" width="532" height="620" rx="132" fill="url(#mark)" />
-    <rect x="326" y="304" width="372" height="56" rx="28" fill="#ffffff" opacity="0.92" />
-    <rect x="326" y="438" width="372" height="56" rx="28" fill="#ffffff" opacity="0.92" />
-    <rect x="326" y="572" width="258" height="56" rx="28" fill="#ffffff" opacity="0.92" />
+  <g filter="url(#card-shadow)">
     <path
-      d="M392 724 498 830 732 596"
-      fill="none"
-      stroke="#ffffff"
-      stroke-width="70"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
+      d="M312 218C312 166.086 354.086 124 406 124H618C669.914 124 712 166.086 712 218V808C712 840.566 674.807 859.17 648.73 839.642L528.8 749.844C518.844 742.389 505.156 742.389 495.2 749.844L375.27 839.642C349.193 859.17 312 840.566 312 808V218Z"
+      fill="url(#bookmark-fill)" />
+    <path
+      d="M394 256C394 236.118 410.118 220 430 220H594C613.882 220 630 236.118 630 256V646.3C630 666.505 606.689 677.797 590.837 665.27L536.815 622.578C522.276 611.086 501.724 611.086 487.185 622.578L433.163 665.27C417.311 677.797 394 666.505 394 646.3V256Z"
+      fill="url(#bookmark-fold)" opacity="0.98" />
+  </g>
+
+  <g filter="url(#link-shadow)">
+    <path
+      d="M390.756 581.244C342.191 629.809 263.465 629.809 214.9 581.244C166.335 532.679 166.335 453.953 214.9 405.388L290.388 329.9C338.953 281.335 417.679 281.335 466.244 329.9L488.872 352.528C502.922 366.578 502.922 389.36 488.872 403.41C474.822 417.46 452.04 417.46 437.99 403.41L415.362 380.782C394.897 360.317 361.735 360.317 341.27 380.782L265.782 456.27C245.317 476.735 245.317 509.897 265.782 530.362C286.247 550.827 319.409 550.827 339.874 530.362L372.402 497.834C386.452 483.784 409.234 483.784 423.284 497.834C437.334 511.884 437.334 534.666 423.284 548.716L390.756 581.244Z"
+      fill="url(#link-fill)" />
+    <path
+      d="M557.756 694.1C509.191 645.535 509.191 566.809 557.756 518.244L590.284 485.716C604.334 471.666 627.116 471.666 641.166 485.716C655.216 499.766 655.216 522.548 641.166 536.598L608.638 569.126C588.173 589.591 588.173 622.753 608.638 643.218C629.103 663.683 662.265 663.683 682.73 643.218L758.218 567.73C778.683 547.265 778.683 514.103 758.218 493.638C737.753 473.173 704.591 473.173 684.126 493.638L661.498 516.266C647.448 530.316 624.666 530.316 610.616 516.266C596.566 502.216 596.566 479.434 610.616 465.384L633.244 442.756C681.809 394.191 760.535 394.191 809.1 442.756C857.665 491.321 857.665 570.047 809.1 618.612L733.612 694.1C685.047 742.665 606.321 742.665 557.756 694.1Z"
+      fill="url(#link-fill)" />
+    <path d="M416 548L608 356" fill="none" stroke="#ffffff" stroke-width="62" stroke-linecap="round" opacity="0.96" />
   </g>
 </svg>
