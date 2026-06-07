@@ -17,7 +17,11 @@
 .favoriteCard {
   border-color: rgba(245, 166, 35, 0.28);
   background:
-    linear-gradient(90deg, rgba(255, 248, 225, 0.96), rgba(255, 255, 255, 0.82)),
+    linear-gradient(
+      90deg,
+      rgba(255, 248, 225, 0.96),
+      rgba(255, 255, 255, 0.82)
+    ),
     rgba(255, 246, 214, 0.9);
 }
 
@@ -127,8 +131,4 @@
   min-width: 20px;
   height: 24px;
   padding: 0;
-}
-
-.favorite {
-  color: #f5a623;
 }

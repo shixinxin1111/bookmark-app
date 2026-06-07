@@ -115,10 +115,11 @@ export function BookmarkCard({
       <div className={styles.actions}>
         <Button
           aria-label={site.isFavorite ? "取消收藏" : "收藏网站"}
-          className={classNames(site.isFavorite && styles.favorite)}
+          className={styles.favorite}
           htmlType="button"
           icon={site.isFavorite ? <IconStarFill /> : <IconStar />}
           size="mini"
+          status="warning"
           type="text"
           onClick={() => void onToggleFavorite()}
         />
