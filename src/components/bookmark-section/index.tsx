@@ -39,12 +39,12 @@ export function BookmarkSection({
   onEditSite,
   onToggleSiteFavorite,
 }: BookmarkSectionProps) {
-  const { handleRef, isDragging, ref } = useSortable({
+  const { handleRef, isDragging, isDropTarget, ref } = useSortable({
     accept: ["column", "site"],
     collisionPriority: CollisionPriority.Low,
     data: {
       categoryId: category.id,
-      kind: "site-list",
+      kind: "category",
     },
     id: category.id,
     index: categoryIndex,
@@ -125,7 +125,7 @@ export function BookmarkSection({
           <div
             className={classNames(
               styles.emptyDropZone,
-              isDragging && styles.gridOver,
+              isDropTarget && styles.gridOver,
             )}
           >
             拖拽网站到这里

@@ -39,6 +39,10 @@ type BookmarkManagerProps = {
     categoryId: string,
     siteId: string,
   ): Promise<BookmarkCategory[] | undefined>;
+  moveCategory(
+    activeCategoryId: string,
+    overCategoryId: string,
+  ): Promise<BookmarkCategory[] | undefined>;
   moveSite(
     activeSiteId: string,
     fromCategoryId: string,
@@ -77,6 +81,10 @@ type DeleteSiteState = {
 };
 
 type DragData =
+  | {
+      kind: "category";
+      categoryId: string;
+    }
   | {
       kind: "site";
       categoryId: string;
@@ -139,6 +147,27 @@ function findSiteCategoryId(categories: BookmarkCategory[], siteId: string) {
   )?.id;
 }
 
+function getCategoryMoveTarget(
+  previousCategories: BookmarkCategory[],
+  nextCategories: BookmarkCategory[],
+  activeCategoryId: string,
+) {
+  const previousIndex = previousCategories.findIndex(
+    (category) => category.id === activeCategoryId,
+  );
+  const nextIndex = nextCategories.findIndex(
+    (category) => category.id === activeCategoryId,
+  );
+
+  if (previousIndex < 0 || nextIndex < 0 || previousIndex === nextIndex) {
+    return undefined;
+  }
+
+  return previousIndex < nextIndex
+    ? nextCategories[nextIndex - 1]
+    : nextCategories[nextIndex + 1];
+}
+
 /**
  * BookmarkManager 渲染普通主窗的完整书签管理界面。
  */
@@ -150,6 +179,7 @@ export function BookmarkManager({
   createSite,
   deleteCategory,
   deleteSite,
+  moveCategory,
   moveSite,
   toggleSiteFavorite,
   updateCategory,
@@ -229,6 +259,38 @@ export function BookmarkManager({
       const { active } = getDragData(event);
 
       if (!active || active.kind !== "site") {
+        if (event.operation.source?.type !== "column") {
+          return;
+        }
+
+        const previousCategories = dragSnapshotRef.current;
+        const nextCategories = move(previousCategories, event);
+
+        if (nextCategories === previousCategories) {
+          return;
+        }
+
+        const activeCategoryId = String(event.operation.source.id);
+        const overCategory = getCategoryMoveTarget(
+          previousCategories,
+          nextCategories,
+          activeCategoryId,
+        );
+
+        if (!overCategory || overCategory.isDefault) {
+          updateDisplayCategories(previousCategories);
+          return;
+        }
+
+        updateDisplayCategories(nextCategories);
+
+        const result = await moveCategory(activeCategoryId, overCategory.id);
+
+        if (result) {
+          updateDisplayCategories(result);
+        } else {
+          updateDisplayCategories(previousCategories);
+        }
         return;
       }
 
@@ -268,7 +330,7 @@ export function BookmarkManager({
         updateDisplayCategories(previousCategories);
       }
     },
-    [moveSite, updateDisplayCategories],
+    [moveCategory, moveSite, updateDisplayCategories],
   );
 
   async function handleCategorySubmit(values: BookmarkCategoryFormValues) {
