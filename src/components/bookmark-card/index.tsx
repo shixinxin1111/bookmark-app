@@ -7,6 +7,7 @@ import {
   IconStar,
   IconStarFill,
 } from "@arco-design/web-react/icon";
+import { Feedback } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import type { BookmarkSite } from "@/types/bookmark";
 import { getBookmarkLinkApi, getErrorMessage } from "@/utils/api";
@@ -39,12 +40,14 @@ export function BookmarkCard({
     accept: "site",
     data: {
       categoryId,
+      group: categoryId,
       kind: "site",
       siteId: site.id,
     },
     group: categoryId,
-    id: `site:${categoryId}:${site.id}`,
+    id: site.id,
     index: siteIndex,
+    plugins: [Feedback.configure({ feedback: "clone" })],
     transition: {
       duration: 220,
       easing: "cubic-bezier(0.22, 1, 0.36, 1)",

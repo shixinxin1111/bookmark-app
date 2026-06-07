@@ -1,7 +1,14 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button, Modal, Spin } from "@arco-design/web-react";
 import { IconFolderAdd, IconLink, IconStar } from "@arco-design/web-react/icon";
-import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
+import {
+  DragDropProvider,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/react";
+import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
+import { move } from "@dnd-kit/helpers";
 import { BookmarkFormModal } from "@/components/bookmark-form-modal";
 import { BookmarkSection } from "@/components/bookmark-section";
 import { CategoryFormModal } from "@/components/category-form-modal";
@@ -31,10 +38,6 @@ type BookmarkManagerProps = {
   deleteSite(
     categoryId: string,
     siteId: string,
-  ): Promise<BookmarkCategory[] | undefined>;
-  moveCategory(
-    activeCategoryId: string,
-    overCategoryId: string,
   ): Promise<BookmarkCategory[] | undefined>;
   moveSite(
     activeSiteId: string,
@@ -74,15 +77,66 @@ type DeleteSiteState = {
 };
 
 type DragData =
-  | { kind: "category"; categoryId: string }
-  | { kind: "category-drop"; categoryId: string }
-  | { kind: "site"; categoryId: string; siteId: string };
+  | {
+      kind: "site";
+      categoryId: string;
+      siteId: string;
+    }
+  | {
+      kind: "site-list";
+      categoryId: string;
+    };
+
+const sensors = [
+  PointerSensor.configure({
+    activatorElements(source) {
+      return [source.element, source.handle];
+    },
+  }),
+  KeyboardSensor,
+];
 
 function getDragData(event: DragEndEvent) {
   return {
     active: event.operation.source?.data as DragData | undefined,
-    over: event.operation.target?.data as DragData | undefined,
   };
+}
+
+function mapSitesByCategory(categories: BookmarkCategory[]) {
+  return Object.fromEntries(
+    categories.map((category) => [category.id, category.sites]),
+  );
+}
+
+function applySiteGroups(
+  categories: BookmarkCategory[],
+  siteGroups: Record<string, BookmarkSite[]>,
+) {
+  return categories.map((category) => ({
+    ...category,
+    sites: siteGroups[category.id] ?? category.sites,
+  }));
+}
+
+function getMovedSiteTarget(categories: BookmarkCategory[], siteId: string) {
+  for (const category of categories) {
+    const siteIndex = category.sites.findIndex((site) => site.id === siteId);
+
+    if (siteIndex !== -1) {
+      return {
+        categoryId: category.id,
+        overSiteId: category.sites[siteIndex + 1]?.id,
+      };
+    }
+  }
+
+  return undefined;
+}
+
+function findSiteCategoryId(categories: BookmarkCategory[], siteId: string) {
+  return categories.find((category) =>
+    category.sites.some((site) => site.id === siteId),
+  )?.id;
 }
 
 /**
@@ -96,7 +150,6 @@ export function BookmarkManager({
   createSite,
   deleteCategory,
   deleteSite,
-  moveCategory,
   moveSite,
   toggleSiteFavorite,
   updateCategory,
@@ -107,58 +160,116 @@ export function BookmarkManager({
   const [deleteCategoryTarget, setDeleteCategoryTarget] =
     useState<BookmarkCategory>();
   const [deleteSiteTarget, setDeleteSiteTarget] = useState<DeleteSiteState>();
+  const [lastCategories, setLastCategories] = useState(categories);
+  const [displayCategories, setDisplayCategories] = useState(categories);
+  const displayCategoriesRef = useRef(categories);
+  const dragSnapshotRef = useRef(categories);
+
+  if (categories !== lastCategories) {
+    setLastCategories(categories);
+    setDisplayCategories(categories);
+  }
+
   const siteCount = useMemo(
     () =>
-      categories.reduce((count, category) => count + category.sites.length, 0),
-    [categories],
+      displayCategories.reduce(
+        (count, category) => count + category.sites.length,
+        0,
+      ),
+    [displayCategories],
   );
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = getDragData(event);
+  const updateDisplayCategories = useCallback(
+    (nextCategories: BookmarkCategory[]) => {
+      displayCategoriesRef.current = nextCategories;
+      setDisplayCategories(nextCategories);
+    },
+    [],
+  );
 
-    if (!active || !over || event.canceled) {
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      displayCategoriesRef.current = displayCategories;
+      dragSnapshotRef.current = displayCategories;
+
+      if (event.operation.source?.type === "column") {
+        return;
+      }
+    },
+    [displayCategories],
+  );
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    if (event.operation.source?.type === "column") {
       return;
     }
 
-    if (event.operation.source?.id === event.operation.target?.id) {
-      return;
-    }
+    setDisplayCategories((currentCategories) => {
+      const currentSiteGroups = mapSitesByCategory(currentCategories);
+      const nextSiteGroups = move(currentSiteGroups, event);
 
-    const transition = event.suspend();
+      if (nextSiteGroups === currentSiteGroups) {
+        return currentCategories;
+      }
 
-    if (active.kind === "category" && over.kind === "category") {
-      void moveCategory(active.categoryId, over.categoryId).then(
-        transition.resume,
-        transition.abort,
-      );
-      return;
-    }
+      const nextCategories = applySiteGroups(currentCategories, nextSiteGroups);
 
-    if (active.kind !== "site") {
-      transition.abort();
-      return;
-    }
+      displayCategoriesRef.current = nextCategories;
+      return nextCategories;
+    });
+  }, []);
 
-    if (over.kind === "site") {
-      void moveSite(
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      if (event.canceled) {
+        updateDisplayCategories(dragSnapshotRef.current);
+        return;
+      }
+
+      const { active } = getDragData(event);
+
+      if (!active || active.kind !== "site") {
+        return;
+      }
+
+      const previousCategories = dragSnapshotRef.current;
+      const nextCategories = displayCategoriesRef.current;
+      const fromCategoryId =
+        findSiteCategoryId(previousCategories, active.siteId) ??
+        active.categoryId;
+      const siteDropTarget = getMovedSiteTarget(nextCategories, active.siteId);
+      const previousSiteTarget = getMovedSiteTarget(
+        previousCategories,
         active.siteId,
-        active.categoryId,
-        over.categoryId,
-        over.siteId,
-      ).then(transition.resume, transition.abort);
-      return;
-    }
-
-    if (over.kind === "category-drop") {
-      void moveSite(active.siteId, active.categoryId, over.categoryId).then(
-        transition.resume,
-        transition.abort,
       );
-      return;
-    }
 
-    transition.abort();
-  }
+      if (!siteDropTarget) {
+        updateDisplayCategories(previousCategories);
+        return;
+      }
+
+      if (
+        fromCategoryId === siteDropTarget.categoryId &&
+        previousSiteTarget?.overSiteId === siteDropTarget.overSiteId
+      ) {
+        return;
+      }
+
+      const result = await moveSite(
+        active.siteId,
+        fromCategoryId,
+        siteDropTarget.categoryId,
+        siteDropTarget.overSiteId,
+      );
+
+      if (result) {
+        updateDisplayCategories(result);
+      } else {
+        updateDisplayCategories(previousCategories);
+      }
+    },
+    [moveSite, updateDisplayCategories],
+  );
 
   async function handleCategorySubmit(values: BookmarkCategoryFormValues) {
     const result = categoryModal?.category
@@ -220,7 +331,7 @@ export function BookmarkManager({
 
         <div className={styles.stats}>
           <span>
-            <strong>{categories.length}</strong>
+            <strong>{displayCategories.length}</strong>
             分类
           </span>
           <span>
@@ -237,9 +348,14 @@ export function BookmarkManager({
       </header>
 
       <Spin block loading={loading} className={styles.body}>
-        <DragDropProvider onDragEnd={(event) => void handleDragEnd(event)}>
+        <DragDropProvider
+          sensors={sensors}
+          onDragEnd={(event) => void handleDragEnd(event)}
+          onDragOver={handleDragOver}
+          onDragStart={handleDragStart}
+        >
           <div className={styles.sections}>
-            {categories.map((category, categoryIndex) => (
+            {displayCategories.map((category, categoryIndex) => (
               <BookmarkSection
                 category={category}
                 categoryIndex={categoryIndex}

@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { Button } from "@arco-design/web-react";
 import {
   IconDelete,
@@ -6,7 +5,7 @@ import {
   IconEdit,
   IconPlus,
 } from "@arco-design/web-react/icon";
-import { useDroppable } from "@dnd-kit/react";
+import { CollisionPriority } from "@dnd-kit/abstract";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { BookmarkCard } from "@/components/bookmark-card";
 import type { BookmarkCategory, BookmarkSite } from "@/types/bookmark";
@@ -40,60 +39,34 @@ export function BookmarkSection({
   onEditSite,
   onToggleSiteFavorite,
 }: BookmarkSectionProps) {
-  const {
-    handleRef,
-    isDragging,
-    ref: categoryRef,
-  } = useSortable({
-    accept: "category",
+  const { handleRef, isDragging, ref } = useSortable({
+    accept: ["column", "site"],
+    collisionPriority: CollisionPriority.Low,
     data: {
       categoryId: category.id,
-      kind: "category",
+      kind: "site-list",
     },
-    disabled: category.isDefault,
-    group: "categories",
-    id: `category:${category.id}`,
+    id: category.id,
     index: categoryIndex,
-    transition: {
-      duration: 220,
-      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-    },
-    type: "category",
+    type: "column",
   });
-  const { isDropTarget, ref: categoryDropRef } = useDroppable({
-    accept: "site",
-    data: {
-      categoryId: category.id,
-      kind: "category-drop",
-    },
-    id: `category-drop:${category.id}`,
-  });
-  const setSectionRef = useCallback(
-    (element: HTMLElement | null) => {
-      categoryRef(element);
-      categoryDropRef(element);
-    },
-    [categoryDropRef, categoryRef],
-  );
 
   return (
     <section
-      ref={setSectionRef}
+      ref={ref}
       className={classNames(styles.section, isDragging && styles.dragging)}
     >
       <header className={styles.header}>
         <div className={styles.titleWrap}>
-          {category.isDefault ? null : (
-            <Button
-              aria-label={`拖拽排序 ${category.name}`}
-              className={styles.dragHandle}
-              htmlType="button"
-              icon={<IconDragDotVertical />}
-              ref={handleRef}
-              size="mini"
-              type="text"
-            />
-          )}
+          <Button
+            aria-label={`拖拽排序 ${category.name}`}
+            className={styles.dragHandle}
+            htmlType="button"
+            icon={<IconDragDotVertical />}
+            ref={handleRef}
+            size="mini"
+            type="text"
+          />
           <div className={styles.heading}>
             <h2 className={styles.title}>{category.name}</h2>
             <span className={styles.count}>{category.sites.length} 个网站</span>
@@ -136,7 +109,7 @@ export function BookmarkSection({
         </div>
       </header>
 
-      <div className={classNames(styles.grid, isDropTarget && styles.gridOver)}>
+      <div className={styles.grid}>
         {category.sites.map((site, siteIndex) => (
           <BookmarkCard
             categoryId={category.id}
@@ -148,6 +121,16 @@ export function BookmarkSection({
             onToggleFavorite={() => onToggleSiteFavorite(category.id, site.id)}
           />
         ))}
+        {category.sites.length === 0 ? (
+          <div
+            className={classNames(
+              styles.emptyDropZone,
+              isDragging && styles.gridOver,
+            )}
+          >
+            拖拽网站到这里
+          </div>
+        ) : null}
       </div>
     </section>
   );
