@@ -466,6 +466,9 @@ export function BookmarkManager({
       </Button>
 
       <CategoryFormModal
+        existingNames={displayCategories
+          .filter((category) => category.id !== categoryModal?.category?.id)
+          .map((category) => category.name)}
         initialValues={
           categoryModal?.category
             ? { name: categoryModal.category.name }
@@ -478,6 +481,14 @@ export function BookmarkManager({
       />
 
       <BookmarkFormModal
+        existingSites={displayCategories.flatMap((category) =>
+          category.sites
+            .filter((site) => site.id !== siteModal?.site?.id)
+            .map((site) => ({
+              domain: site.domain,
+              title: site.title,
+            })),
+        )}
         initialValues={
           siteModal?.site
             ? {

@@ -119,7 +119,9 @@ export function normalizeCategoryInput(
   return { name };
 }
 
-export function normalizeSiteInput(input: BookmarkSiteInput): BookmarkSiteInput {
+export function normalizeSiteInput(
+  input: BookmarkSiteInput,
+): BookmarkSiteInput {
   const normalizedInput = {
     logoUrl: input.logoUrl.trim(),
     title: input.title.trim(),
@@ -135,13 +137,69 @@ export function normalizeSiteInput(input: BookmarkSiteInput): BookmarkSiteInput 
     throw new Error("网站域名不能为空。");
   }
 
-  assertHttpUrl(normalizedInput.domain, "网站域名必须是有效的 http/https 地址。");
+  assertHttpUrl(
+    normalizedInput.domain,
+    "网站域名必须是有效的 http/https 地址。",
+  );
 
   if (normalizedInput.logoUrl) {
-    assertHttpUrl(normalizedInput.logoUrl, "图标链接必须是有效的 http/https 地址。");
+    assertHttpUrl(
+      normalizedInput.logoUrl,
+      "图标链接必须是有效的 http/https 地址。",
+    );
   }
 
   return normalizedInput;
+}
+
+function normalizeTextForComparison(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function normalizeDomainForComparison(domain: string) {
+  return new URL(normalizeBookmarkDomain(domain)).href;
+}
+
+function assertUniqueCategoryName(
+  categories: BookmarkCategory[],
+  name: string,
+  excludeCategoryId?: string,
+) {
+  const normalizedName = normalizeTextForComparison(name);
+  const hasDuplicate = categories.some(
+    (category) =>
+      category.id !== excludeCategoryId &&
+      normalizeTextForComparison(category.name) === normalizedName,
+  );
+
+  if (hasDuplicate) {
+    throw new Error("已存在同名分类。");
+  }
+}
+
+function assertUniqueSite(
+  categories: BookmarkCategory[],
+  input: BookmarkSiteInput,
+  excludeSiteId?: string,
+) {
+  const normalizedTitle = normalizeTextForComparison(input.title);
+  const normalizedDomain = normalizeDomainForComparison(input.domain);
+
+  for (const category of categories) {
+    for (const site of category.sites) {
+      if (site.id === excludeSiteId) {
+        continue;
+      }
+
+      if (normalizeTextForComparison(site.title) === normalizedTitle) {
+        throw new Error("已存在同名网站。");
+      }
+
+      if (normalizeDomainForComparison(site.domain) === normalizedDomain) {
+        throw new Error("已存在相同网站域名。");
+      }
+    }
+  }
 }
 
 export function ensureUncategorizedCategory(
@@ -295,6 +353,7 @@ export function createBookmarkStore(bookmarksFilePath: string) {
         const normalizedInput = normalizeCategoryInput(input);
         const now = Date.now();
         const categories = await readBookmarks();
+        assertUniqueCategoryName(categories, normalizedInput.name);
 
         return writeBookmarks([
           ...categories.filter(
@@ -322,6 +381,7 @@ export function createBookmarkStore(bookmarksFilePath: string) {
 
         const normalizedInput = normalizeCategoryInput(input);
         const categories = await readBookmarks();
+        assertUniqueCategoryName(categories, normalizedInput.name, categoryId);
         let didUpdate = false;
         const now = Date.now();
         const nextCategories = categories.map((category) => {
@@ -385,6 +445,7 @@ export function createBookmarkStore(bookmarksFilePath: string) {
       return withBookmarkWrite(async () => {
         const normalizedInput = normalizeSiteInput(input);
         const categories = await readBookmarks();
+        assertUniqueSite(categories, normalizedInput);
         let didCreate = false;
         const now = Date.now();
         const nextCategories = categories.map((category) => {
@@ -420,6 +481,7 @@ export function createBookmarkStore(bookmarksFilePath: string) {
       return withBookmarkWrite(async () => {
         const normalizedInput = normalizeSiteInput(input);
         const categories = await readBookmarks();
+        assertUniqueSite(categories, normalizedInput, siteId);
         let didUpdate = false;
         const now = Date.now();
         const nextCategories = categories.map((category) => {

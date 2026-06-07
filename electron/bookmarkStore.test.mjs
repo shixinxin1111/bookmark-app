@@ -49,6 +49,63 @@ test("新增网站会裁剪输入、补齐协议并持久化", async () => {
   });
 });
 
+test("分类名称不能重复", async () => {
+  await withTempStore(async (store) => {
+    const [category] = await store.createCategory({
+      name: " 工作 ",
+    });
+
+    await assert.rejects(
+      () =>
+        store.createCategory({
+          name: "工作",
+        }),
+      /已存在同名分类/,
+    );
+
+    await assert.rejects(
+      () =>
+        store.updateCategory(category.id, {
+          name: " 未分类 ",
+        }),
+      /已存在同名分类/,
+    );
+  });
+});
+
+test("网站标题和域名不能重复", async () => {
+  await withTempStore(async (store) => {
+    await store.createSite(UNCATEGORIZED_CATEGORY_ID, {
+      logoUrl: "",
+      title: " Example ",
+      domain: " example.com ",
+      note: "",
+    });
+
+    await assert.rejects(
+      () =>
+        store.createSite(UNCATEGORIZED_CATEGORY_ID, {
+          logoUrl: "",
+          title: "example",
+          domain: "other.com",
+          note: "",
+        }),
+      /已存在同名网站/,
+    );
+
+    await assert.rejects(
+      () =>
+        store.createSite(UNCATEGORIZED_CATEGORY_ID, {
+          logoUrl: "",
+          title: "Other",
+          domain: "https://example.com/",
+          note: "",
+        }),
+      /已存在相同网站域名/,
+    );
+  });
+});
+
 test("损坏文件会抛出格式错误", async () => {
   await withTempStore(async (store, bookmarksFilePath) => {
     await writeFile(bookmarksFilePath, '{"broken":true}', "utf8");

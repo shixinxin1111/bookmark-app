@@ -7,7 +7,13 @@ import {
   normalizeBookmarkDomain,
 } from "@/utils/bookmark-url";
 
+type ExistingSite = {
+  domain: string;
+  title: string;
+};
+
 type BookmarkFormModalProps = {
+  existingSites?: ExistingSite[];
   initialValues?: BookmarkFormValues;
   mode: "create" | "edit";
   visible: boolean;
@@ -21,6 +27,18 @@ const defaultValues: BookmarkFormValues = {
   domain: "",
   note: "",
 };
+
+function normalizeNameForCompare(name: string) {
+  return name.trim().toLocaleLowerCase();
+}
+
+function normalizeDomainForCompare(domain: string) {
+  try {
+    return new URL(normalizeBookmarkDomain(domain)).href;
+  } catch {
+    return normalizeBookmarkDomain(domain).trim().toLocaleLowerCase();
+  }
+}
 
 function validateOptionalUrl(
   value: string | undefined,
@@ -55,6 +73,7 @@ function validateRequiredUrl(
  * BookmarkFormModal 渲染网站创建和编辑共用表单，并提供网页元信息自动获取。
  */
 export function BookmarkFormModal({
+  existingSites = [],
   initialValues,
   mode,
   visible,
@@ -105,15 +124,6 @@ export function BookmarkFormModal({
     }
   }
 
-  async function handleSubmit(values: BookmarkFormValues) {
-    await onSubmit({
-      logoUrl: values.logoUrl.trim(),
-      title: values.title.trim(),
-      domain: normalizeBookmarkDomain(values.domain),
-      note: values.note.trim(),
-    });
-  }
-
   return (
     <Modal
       title={mode === "create" ? "添加网站" : "编辑网站"}
@@ -124,7 +134,7 @@ export function BookmarkFormModal({
       <Form
         form={form}
         layout="vertical"
-        onSubmit={(values) => void handleSubmit(values)}
+        onSubmit={(values) => void onSubmit(values)}
       >
         <Form.Item
           field="domain"
@@ -132,7 +142,27 @@ export function BookmarkFormModal({
           rules={[
             {
               required: true,
-              validator: validateRequiredUrl,
+              validator: (value, callback) => {
+                validateRequiredUrl(value, (error) => {
+                  if (error) {
+                    callback(error);
+                    return;
+                  }
+
+                  if (
+                    existingSites.some(
+                      (site) =>
+                        normalizeDomainForCompare(site.domain) ===
+                        normalizeDomainForCompare(value),
+                    )
+                  ) {
+                    callback("已存在相同网站域名");
+                    return;
+                  }
+
+                  callback();
+                });
+              },
             },
           ]}
         >
@@ -161,6 +191,17 @@ export function BookmarkFormModal({
               validator: (value, callback) => {
                 if (!value?.trim()) {
                   callback("请输入网站标题");
+                  return;
+                }
+
+                if (
+                  existingSites.some(
+                    (site) =>
+                      normalizeNameForCompare(site.title) ===
+                      normalizeNameForCompare(value),
+                  )
+                ) {
+                  callback("已存在同名网站");
                   return;
                 }
 
