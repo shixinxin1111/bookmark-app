@@ -4,38 +4,24 @@ import styles from "./index.module.css";
 
 type AppShellProps = {
   children: ReactNode;
-  isFloating: boolean;
-  isFloatingCollapsed: boolean;
+  isCompact: boolean;
   titlebar: ReactNode;
 };
 
 /**
  * AppShell 渲染应用最外层窗口布局。
  *
- * 该组件集中管理普通窗口、悬浮窗和收起态的根布局样式，业务内容通过 children 注入。
+ * 该组件集中管理主窗口和托盘弹出窗的根布局样式，业务内容通过 children 注入。
  */
-export function AppShell({
-  children,
-  isFloating,
-  isFloatingCollapsed,
-  titlebar,
-}: AppShellProps) {
+export function AppShell({ children, isCompact, titlebar }: AppShellProps) {
   return (
-    <main
-      className={classNames(
-        styles.app,
-        isFloating && styles.floating,
-        isFloatingCollapsed && styles.collapsed,
-      )}
-    >
+    <main className={classNames(styles.app, isCompact && styles.compact)}>
       <section className={styles.panel}>
         {titlebar}
 
-        {isFloatingCollapsed ? null : (
-          <div className={styles.content}>
-            <div className={styles.contentInner}>{children}</div>
-          </div>
-        )}
+        <div className={styles.content}>
+          <div className={styles.contentInner}>{children}</div>
+        </div>
       </section>
     </main>
   );

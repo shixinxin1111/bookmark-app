@@ -6,18 +6,20 @@ import {
   nativeImage,
   screen,
   shell,
+  systemPreferences,
   Tray,
-  type Display,
   type Rectangle,
 } from "electron";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import {
   createBookmarkStore,
+  type BookmarkCategory,
   type BookmarkCategoryInput,
   type BookmarkSiteInput,
 } from "./bookmarkStore.js";
 import { fetchBookmarkMetadata } from "./bookmarkMetadata.js";
+import { getTrayIconSource } from "./trayIcon.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const rendererUrl = process.env.VITE_DEV_SERVER_URL ?? "http://127.0.0.1:5173";
@@ -26,12 +28,6 @@ const preloadPath = path.join(currentDir, "preload.js");
 const devTrayIconPath = path.join(process.cwd(), "public/favicon.svg");
 const packagedTrayIconPath = path.join(currentDir, "../renderer/favicon.svg");
 
-type BookmarkWindowMode = "normal" | "floating" | "miniFloating";
-
-type BookmarkWindowState = {
-  mode: BookmarkWindowMode;
-};
-
 const normalWindowSize = {
   width: 1000,
   height: 720,
@@ -39,26 +35,26 @@ const normalWindowSize = {
   minHeight: 520,
 };
 
-const floatingWindowSize = {
-  expanded: {
-    width: 390,
-    height: 600,
-  },
-  collapsed: {
-    width: 260,
-    height: 42,
-  },
+const trayWindowSize = {
+  width: 390,
+  height: 600,
 };
 
 const visibleWindowBackground = "#f4f1ea";
 
 let mainWindow: BrowserWindow | null = null;
+let trayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
-
-let currentWindowState: BookmarkWindowState = {
-  mode: "normal",
-};
+let bookmarkStore: ReturnType<typeof createBookmarkStore> | null = null;
+let isHidingForMinimize = false;
+let isTrayWindowOpen = false;
+let isTrayMouseDown = false;
+let wasTrayWindowOpenOnMouseDown = false;
+let trayMouseDownTimer: ReturnType<typeof setTimeout> | null = null;
+let trayAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+let isTrayMenuOpen = false;
+let lastTrayMenuClosedAt = 0;
 
 function clamp(value: number, min: number, max: number) {
   if (max < min) {
@@ -68,36 +64,23 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function broadcastWindowState() {
-  mainWindow?.webContents.send(
-    "bookmark-window:mode-changed",
-    currentWindowState,
-  );
-}
-
-function setWindowButtonVisible(window: BrowserWindow, visible: boolean) {
-  if (process.platform === "darwin") {
-    window.setWindowButtonVisibility(visible);
-  }
-}
-
-function getSafeTopRightAnchoredBounds(
-  display: Display,
-  currentBounds: Rectangle,
+function getTrayWindowBounds(
+  anchorBounds: Rectangle,
   size: { width: number; height: number },
 ) {
+  const display = screen.getDisplayMatching(anchorBounds);
   const { workArea } = display;
-  // Keeps the titlebar action area stable when window modes use different sizes.
-  const currentRight = currentBounds.x + currentBounds.width;
+  const openBelow = anchorBounds.y < workArea.y + workArea.height / 2;
+  const preferredX =
+    anchorBounds.x + Math.round((anchorBounds.width - size.width) / 2);
+  const preferredY = openBelow
+    ? anchorBounds.y + anchorBounds.height + 8
+    : anchorBounds.y - size.height - 8;
 
   return {
-    x: clamp(
-      currentRight - size.width,
-      workArea.x,
-      workArea.x + workArea.width - size.width,
-    ),
+    x: clamp(preferredX, workArea.x, workArea.x + workArea.width - size.width),
     y: clamp(
-      currentBounds.y,
+      preferredY,
       workArea.y,
       workArea.y + workArea.height - size.height,
     ),
@@ -106,123 +89,338 @@ function getSafeTopRightAnchoredBounds(
   };
 }
 
-function applyFloatingWindow(
-  mode: Extract<BookmarkWindowMode, "floating" | "miniFloating">,
-) {
-  if (!mainWindow) {
-    return currentWindowState;
-  }
-
-  const window = mainWindow;
-  const currentBounds = window.getBounds();
-  const display = screen.getDisplayMatching(currentBounds);
-  const size =
-    mode === "floating"
-      ? floatingWindowSize.expanded
-      : floatingWindowSize.collapsed;
-
-  currentWindowState = {
-    mode,
+function expandBounds(bounds: Rectangle, padding: number) {
+  return {
+    x: bounds.x - padding,
+    y: bounds.y - padding,
+    width: bounds.width + padding * 2,
+    height: bounds.height + padding * 2,
   };
-
-  window.setAlwaysOnTop(true, "floating");
-  window.setResizable(false);
-  window.setBackgroundColor(visibleWindowBackground);
-  window.setOpacity(1);
-  window.setMinimumSize(size.width, size.height);
-  setWindowButtonVisible(window, false);
-  window.setBounds(getSafeTopRightAnchoredBounds(display, currentBounds, size));
-  window.show();
-  window.focus();
-  broadcastWindowState();
-  return currentWindowState;
 }
 
-function applyWindowMode(mode: BookmarkWindowMode) {
-  if (!mainWindow) {
-    return currentWindowState;
-  }
-
-  const window = mainWindow;
-  const currentBounds = window.getBounds();
-  const display = screen.getDisplayMatching(currentBounds);
-
-  if (mode === "floating" || mode === "miniFloating") {
-    return applyFloatingWindow(mode);
-  }
-
-  currentWindowState = {
-    mode: "normal",
-  };
-  window.setAlwaysOnTop(false);
-  window.setResizable(true);
-  window.setBackgroundColor(visibleWindowBackground);
-  window.setOpacity(1);
-  window.setMinimumSize(normalWindowSize.minWidth, normalWindowSize.minHeight);
-  setWindowButtonVisible(window, true);
-  window.setBounds(
-    getSafeTopRightAnchoredBounds(display, currentBounds, {
-      width: normalWindowSize.width,
-      height: normalWindowSize.height,
-    }),
+function isPointInBounds(point: { x: number; y: number }, bounds: Rectangle) {
+  return (
+    point.x >= bounds.x &&
+    point.x <= bounds.x + bounds.width &&
+    point.y >= bounds.y &&
+    point.y <= bounds.y + bounds.height
   );
+}
+
+function isCursorInTrayBounds() {
+  if (!tray) {
+    return false;
+  }
+
+  const cursorPoint = screen.getCursorScreenPoint();
+  const trayBounds = expandBounds(tray.getBounds(), 8);
+
+  return isPointInBounds(cursorPoint, trayBounds);
+}
+
+function getWindowUrl(view: "main" | "tray") {
+  const url = app.isPackaged
+    ? new URL(pathToFileURL(rendererPath).toString())
+    : new URL(rendererUrl);
+
+  if (view === "tray") {
+    url.searchParams.set("view", "tray");
+  }
+
+  return url.toString();
+}
+
+function loadWindow(window: BrowserWindow, view: "main" | "tray") {
+  return window.loadURL(getWindowUrl(view));
+}
+
+function createTrayIcon() {
+  const iconSource = getTrayIconSource({
+    devIconPath: devTrayIconPath,
+    isPackaged: app.isPackaged,
+    packagedIconPath: packagedTrayIconPath,
+    platform: process.platform,
+  });
+  const trayIcon =
+    iconSource.kind === "dataUrl"
+      ? nativeImage.createFromDataURL(iconSource.value)
+      : nativeImage.createFromPath(iconSource.value);
+
+  if (process.platform === "darwin") {
+    trayIcon.setTemplateImage(true);
+  }
+
+  return trayIcon;
+}
+
+function listFavoriteSites(categories: BookmarkCategory[]) {
+  return categories.flatMap((category) =>
+    category.sites.filter((site) => site.isFavorite),
+  );
+}
+
+async function updateTrayIndicator() {
+  if (!tray || !bookmarkStore) {
+    return;
+  }
+
+  const favoriteCount = listFavoriteSites(await bookmarkStore.list()).length;
+
+  tray.setToolTip(
+    favoriteCount > 0 ? `Bookmark（${favoriteCount} 个收藏）` : "Bookmark",
+  );
+
+  if (process.platform === "darwin") {
+    tray.setTitle(favoriteCount > 0 ? String(favoriteCount) : "");
+  }
+}
+
+function markTrayMouseDown() {
+  cancelPendingTrayAutoHide();
+  isTrayMouseDown = true;
+  wasTrayWindowOpenOnMouseDown =
+    wasTrayWindowOpenOnMouseDown || isTrayWindowOpen;
+
+  if (trayMouseDownTimer) {
+    clearTimeout(trayMouseDownTimer);
+  }
+
+  trayMouseDownTimer = setTimeout(() => {
+    clearTrayMouseDown();
+  }, 500);
+}
+
+function clearTrayMouseDown() {
+  isTrayMouseDown = false;
+  wasTrayWindowOpenOnMouseDown = false;
+
+  if (!trayMouseDownTimer) {
+    return;
+  }
+
+  clearTimeout(trayMouseDownTimer);
+  trayMouseDownTimer = null;
+}
+
+function cancelPendingTrayAutoHide() {
+  if (!trayAutoHideTimer) {
+    return;
+  }
+
+  clearTimeout(trayAutoHideTimer);
+  trayAutoHideTimer = null;
+}
+
+function scheduleTrayWindowAutoHide() {
+  cancelPendingTrayAutoHide();
+
+  if (isCursorInTrayBounds()) {
+    return;
+  }
+
+  trayAutoHideTimer = setTimeout(() => {
+    trayAutoHideTimer = null;
+    hideTrayWindow();
+  }, 0);
+}
+
+function hideTrayWindow({ force = false }: { force?: boolean } = {}) {
+  if (force) {
+    cancelPendingTrayAutoHide();
+  }
+
+  if (!force && isTrayMouseDown) {
+    return;
+  }
+
+  if (trayWindow?.isVisible()) {
+    trayWindow.hide();
+  }
+
+  isTrayWindowOpen = false;
+}
+
+function ensureMainWindow() {
+  if (!mainWindow) {
+    createMainWindow();
+  }
+
+  return mainWindow;
+}
+
+function showMainWindow() {
+  const window = ensureMainWindow();
+
+  if (!window) {
+    return;
+  }
+
+  hideTrayWindow({ force: true });
+
+  if (window.isMinimized()) {
+    window.restore();
+  }
+
   window.show();
   window.focus();
-  broadcastWindowState();
-  return currentWindowState;
+}
+
+function positionTrayWindow(anchorBounds?: Rectangle) {
+  if (!trayWindow) {
+    return;
+  }
+
+  const referenceBounds = anchorBounds ?? tray?.getBounds();
+
+  if (!referenceBounds) {
+    return;
+  }
+
+  trayWindow.setBounds(getTrayWindowBounds(referenceBounds, trayWindowSize));
+}
+
+function createTrayWindow() {
+  if (trayWindow) {
+    return trayWindow;
+  }
+
+  trayWindow = new BrowserWindow({
+    width: trayWindowSize.width,
+    height: trayWindowSize.height,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    movable: false,
+    show: false,
+    frame: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hiddenInMissionControl: true,
+    backgroundColor: visibleWindowBackground,
+    roundedCorners: true,
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  trayWindow.on("blur", () => {
+    scheduleTrayWindowAutoHide();
+  });
+
+  trayWindow.on("closed", () => {
+    trayWindow = null;
+  });
+
+  void loadWindow(trayWindow, "tray");
+  return trayWindow;
+}
+
+function showTrayWindow(anchorBounds?: Rectangle) {
+  const window = createTrayWindow();
+
+  positionTrayWindow(anchorBounds);
+  window.show();
+  isTrayWindowOpen = true;
+  window.focus();
+}
+
+function toggleTrayWindow(anchorBounds?: Rectangle) {
+  cancelPendingTrayAutoHide();
+
+  if (isTrayWindowOpen || wasTrayWindowOpenOnMouseDown) {
+    hideTrayWindow({ force: true });
+    clearTrayMouseDown();
+    return;
+  }
+
+  showTrayWindow(anchorBounds);
+  clearTrayMouseDown();
+}
+
+function registerMenuBarTracking() {
+  if (process.platform !== "darwin") {
+    return;
+  }
+
+  systemPreferences.subscribeLocalNotification(
+    "NSMenuDidBeginTrackingNotification",
+    () => {
+      if (isCursorInTrayBounds()) {
+        wasTrayWindowOpenOnMouseDown =
+          wasTrayWindowOpenOnMouseDown || isTrayWindowOpen;
+      }
+
+      hideTrayWindow({ force: true });
+    },
+  );
 }
 
 function registerWindowIpc() {
-  ipcMain.handle("bookmark-window:get-mode", () => currentWindowState);
-  ipcMain.handle("bookmark-window:set-mode", (_, mode: BookmarkWindowMode) =>
-    applyWindowMode(mode),
-  );
+  ipcMain.handle("bookmark-window:show-main-window", () => {
+    showMainWindow();
+  });
 }
 
 function registerBookmarkStoreIpc() {
-  const bookmarkStore = createBookmarkStore(
+  bookmarkStore = createBookmarkStore(
     path.join(app.getPath("userData"), "bookmarks.json"),
   );
+  const store = bookmarkStore;
 
-  ipcMain.handle("bookmark-store:list", () => bookmarkStore.list());
+  const withTrayRefresh = async (
+    updater: () => Promise<BookmarkCategory[]>,
+  ) => {
+    const nextCategories = await updater();
+    await updateTrayIndicator();
+    return nextCategories;
+  };
+
+  ipcMain.handle("bookmark-store:list", () => store.list());
   ipcMain.handle(
     "bookmark-store:create-category",
-    (_, input: BookmarkCategoryInput) => bookmarkStore.createCategory(input),
+    (_, input: BookmarkCategoryInput) =>
+      withTrayRefresh(() => store.createCategory(input)),
   );
   ipcMain.handle(
     "bookmark-store:update-category",
     (_, categoryId: string, input: BookmarkCategoryInput) =>
-      bookmarkStore.updateCategory(categoryId, input),
+      withTrayRefresh(() => store.updateCategory(categoryId, input)),
   );
   ipcMain.handle(
     "bookmark-store:delete-category",
     (_, categoryId: string, deleteSites: boolean) =>
-      bookmarkStore.deleteCategory(categoryId, deleteSites),
+      withTrayRefresh(() => store.deleteCategory(categoryId, deleteSites)),
   );
   ipcMain.handle(
     "bookmark-store:create-site",
     (_, categoryId: string, input: BookmarkSiteInput) =>
-      bookmarkStore.createSite(categoryId, input),
+      withTrayRefresh(() => store.createSite(categoryId, input)),
   );
   ipcMain.handle(
     "bookmark-store:update-site",
     (_, categoryId: string, siteId: string, input: BookmarkSiteInput) =>
-      bookmarkStore.updateSite(categoryId, siteId, input),
+      withTrayRefresh(() => store.updateSite(categoryId, siteId, input)),
   );
   ipcMain.handle(
     "bookmark-store:delete-site",
     (_, categoryId: string, siteId: string) =>
-      bookmarkStore.deleteSite(categoryId, siteId),
+      withTrayRefresh(() => store.deleteSite(categoryId, siteId)),
   );
   ipcMain.handle(
     "bookmark-store:toggle-site-favorite",
     (_, categoryId: string, siteId: string) =>
-      bookmarkStore.toggleSiteFavorite(categoryId, siteId),
+      withTrayRefresh(() => store.toggleSiteFavorite(categoryId, siteId)),
   );
   ipcMain.handle(
     "bookmark-store:move-category",
     (_, activeCategoryId: string, overCategoryId: string) =>
-      bookmarkStore.moveCategory(activeCategoryId, overCategoryId),
+      withTrayRefresh(() =>
+        store.moveCategory(activeCategoryId, overCategoryId),
+      ),
   );
   ipcMain.handle(
     "bookmark-store:move-site",
@@ -233,11 +431,8 @@ function registerBookmarkStoreIpc() {
       toCategoryId: string,
       overSiteId?: string,
     ) =>
-      bookmarkStore.moveSite(
-        activeSiteId,
-        fromCategoryId,
-        toCategoryId,
-        overSiteId,
+      withTrayRefresh(() =>
+        store.moveSite(activeSiteId, fromCategoryId, toCategoryId, overSiteId),
       ),
   );
 }
@@ -265,45 +460,68 @@ function createTray() {
     return tray;
   }
 
-  const trayIconPath = app.isPackaged ? packagedTrayIconPath : devTrayIconPath;
-  const trayIcon = nativeImage.createFromPath(trayIconPath);
-  tray = new Tray(trayIcon);
-  tray.setToolTip("Bookmark");
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        label: "显示主窗口",
-        click: () => {
-          applyWindowMode("normal");
-        },
-      },
-      {
-        label: "显示悬浮窗",
-        click: () => {
-          applyWindowMode("floating");
-        },
-      },
-      {
-        label: "显示迷你悬浮窗",
-        click: () => {
-          applyWindowMode("miniFloating");
-        },
-      },
-      { type: "separator" },
-      {
-        label: "退出应用",
-        click: () => {
-          isQuitting = true;
-          app.quit();
-        },
-      },
-    ]),
-  );
+  tray = new Tray(createTrayIcon());
+  if (process.platform === "darwin") {
+    tray.setIgnoreDoubleClickEvents(true);
+  }
 
-  tray.on("click", () => {
-    applyWindowMode("normal");
+  const trayMenu = Menu.buildFromTemplate([
+    {
+      label: "打开悬浮窗",
+      click: () => {
+        toggleTrayWindow();
+      },
+    },
+    {
+      label: "显示主窗口",
+      click: () => {
+        showMainWindow();
+      },
+    },
+    { type: "separator" },
+    {
+      label: "退出应用",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  trayMenu.on("menu-will-show", () => {
+    isTrayMenuOpen = true;
+    hideTrayWindow({ force: true });
   });
 
+  trayMenu.on("menu-will-close", () => {
+    isTrayMenuOpen = false;
+    lastTrayMenuClosedAt = Date.now();
+  });
+
+  tray.on("mouse-down", () => {
+    markTrayMouseDown();
+  });
+
+  tray.on("click", (_, bounds) => {
+    toggleTrayWindow(bounds);
+  });
+
+  tray.on("right-click", () => {
+    cancelPendingTrayAutoHide();
+
+    if (isTrayMenuOpen) {
+      tray?.closeContextMenu();
+      return;
+    }
+
+    if (Date.now() - lastTrayMenuClosedAt < 250) {
+      return;
+    }
+
+    tray?.popUpContextMenu(trayMenu);
+  });
+
+  void updateTrayIndicator();
   return tray;
 }
 
@@ -331,23 +549,42 @@ function createMainWindow() {
 
   createTray();
 
-  mainWindow.on("close", (event) => {
-    if (!isQuitting && currentWindowState.mode !== "normal") {
-      event.preventDefault();
-      mainWindow?.hide();
+  mainWindow.on("hide", () => {
+    if (!isQuitting || !isHidingForMinimize) {
+      return;
     }
+
+    isHidingForMinimize = false;
+  });
+
+  mainWindow.on("close", (event) => {
+    if (isQuitting) {
+      return;
+    }
+
+    if (mainWindow?.isMinimized()) {
+      return;
+    }
+
+    event.preventDefault();
+    mainWindow?.hide();
+  });
+
+  mainWindow.on("minimize", (() => {
+    isHidingForMinimize = true;
+    mainWindow?.hide();
+  }) as () => void);
+
+  mainWindow.on("show", () => {
+    isHidingForMinimize = false;
+    hideTrayWindow();
   });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 
-  if (app.isPackaged) {
-    void mainWindow.loadFile(rendererPath);
-    return;
-  }
-
-  void mainWindow.loadURL(rendererUrl);
+  void loadWindow(mainWindow, "main");
 }
 
 app.whenReady().then(() => {
@@ -355,15 +592,11 @@ app.whenReady().then(() => {
   registerBookmarkStoreIpc();
   registerBookmarkMetadataIpc();
   registerLinkIpc();
+  registerMenuBarTracking();
   createMainWindow();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-      return;
-    }
-
-    mainWindow?.show();
+    showMainWindow();
   });
 });
 

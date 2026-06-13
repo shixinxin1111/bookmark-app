@@ -14,7 +14,7 @@
   -webkit-app-region: drag;
 }
 
-.floating {
+.compact {
   padding: 0 10px 0 14px;
 }
 
@@ -55,12 +55,18 @@
   -webkit-app-region: no-drag;
 }
 
+.actionButton:global(.arco-btn),
+.actionButton:global(.arco-btn:focus),
+.actionButton:global(.arco-btn:focus-visible) {
+  box-shadow: none;
+}
+
 @media (max-width: 760px) {
   .titlebar {
     padding-left: 76px;
   }
 
-  .floating {
+  .compact {
     padding-left: 12px;
   }
 }

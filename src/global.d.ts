@@ -1,9 +1,3 @@
-type BookmarkWindowMode = "normal" | "floating" | "miniFloating";
-
-type BookmarkWindowState = {
-  mode: BookmarkWindowMode;
-};
-
 type BookmarkSite = {
   id: string;
   logoUrl: string;
@@ -44,17 +38,9 @@ type BookmarkMetadata = {
 
 type BookmarkWindowApi = {
   /**
-   * getMode 读取主进程记录的当前窗口形态，用于渲染层初始化同步。
+   * showMainWindow 从菜单栏弹出窗回到主窗口。
    */
-  getMode(): Promise<BookmarkWindowState>;
-  /**
-   * setMode 请求主进程切换窗口形态，实际窗口尺寸由主进程裁决。
-   */
-  setMode(mode: BookmarkWindowMode): Promise<BookmarkWindowState>;
-  /**
-   * onModeChange 订阅主进程形态变化，返回取消订阅函数。
-   */
-  onModeChange(callback: (state: BookmarkWindowState) => void): () => void;
+  showMainWindow(): Promise<void>;
 };
 
 type BookmarkStoreApi = {
@@ -65,7 +51,9 @@ type BookmarkStoreApi = {
   /**
    * createCategory 创建一个普通分类。
    */
-  createCategory(input: BookmarkCategoryFormValues): Promise<BookmarkCategory[]>;
+  createCategory(
+    input: BookmarkCategoryFormValues,
+  ): Promise<BookmarkCategory[]>;
   /**
    * updateCategory 更新普通分类名称。
    */

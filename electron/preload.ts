@@ -1,11 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-type BookmarkWindowMode = "normal" | "floating" | "miniFloating";
-
-type BookmarkWindowState = {
-  mode: BookmarkWindowMode;
-};
-
 type BookmarkSite = {
   id: string;
   logoUrl: string;
@@ -49,39 +43,17 @@ type BookmarkMetadata = {
  * 这里只暴露受控能力，不把 ipcRenderer 原始对象传给渲染层。
  */
 contextBridge.exposeInMainWorld("bookmarkWindow", {
-  getMode: () =>
-    ipcRenderer.invoke(
-      "bookmark-window:get-mode",
-    ) as Promise<BookmarkWindowState>,
-  setMode: (mode: BookmarkWindowMode) =>
-    ipcRenderer.invoke(
-      "bookmark-window:set-mode",
-      mode,
-    ) as Promise<BookmarkWindowState>,
-  onModeChange: (callback: (state: BookmarkWindowState) => void) => {
-    const listener = (
-      _: Electron.IpcRendererEvent,
-      state: BookmarkWindowState,
-    ) => {
-      callback(state);
-    };
-
-    ipcRenderer.on("bookmark-window:mode-changed", listener);
-
-    return () => {
-      ipcRenderer.removeListener("bookmark-window:mode-changed", listener);
-    };
-  },
+  showMainWindow: () =>
+    ipcRenderer.invoke("bookmark-window:show-main-window") as Promise<void>,
 });
 
 contextBridge.exposeInMainWorld("bookmarkStore", {
   list: () =>
     ipcRenderer.invoke("bookmark-store:list") as Promise<BookmarkCategory[]>,
   createCategory: (input: BookmarkCategoryFormValues) =>
-    ipcRenderer.invoke(
-      "bookmark-store:create-category",
-      input,
-    ) as Promise<BookmarkCategory[]>,
+    ipcRenderer.invoke("bookmark-store:create-category", input) as Promise<
+      BookmarkCategory[]
+    >,
   updateCategory: (categoryId: string, input: BookmarkCategoryFormValues) =>
     ipcRenderer.invoke(
       "bookmark-store:update-category",
