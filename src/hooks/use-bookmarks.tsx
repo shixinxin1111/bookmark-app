@@ -33,6 +33,12 @@ export function useBookmarks() {
       };
     }
 
+    const unsubscribe = bookmarkStore.onDidChange((nextCategories) => {
+      if (isMounted) {
+        setCategories(nextCategories);
+      }
+    });
+
     void bookmarkStore
       .list()
       .then((nextCategories) => {
@@ -53,6 +59,7 @@ export function useBookmarks() {
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 

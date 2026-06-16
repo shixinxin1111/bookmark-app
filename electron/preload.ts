@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+const bookmarkStoreDidChangeChannel = "bookmark-store:did-change";
 
 type BookmarkSite = {
   id: string;
@@ -110,6 +111,23 @@ contextBridge.exposeInMainWorld("bookmarkStore", {
       toCategoryId,
       overSiteId,
     ) as Promise<BookmarkCategory[]>,
+  onDidChange: (listener: (categories: BookmarkCategory[]) => void) => {
+    const wrappedListener = (
+      _event: unknown,
+      categories: BookmarkCategory[],
+    ) => {
+      listener(categories);
+    };
+
+    ipcRenderer.on(bookmarkStoreDidChangeChannel, wrappedListener);
+
+    return () => {
+      ipcRenderer.removeListener(
+        bookmarkStoreDidChangeChannel,
+        wrappedListener,
+      );
+    };
+  },
 });
 
 contextBridge.exposeInMainWorld("bookmarkMetadata", {

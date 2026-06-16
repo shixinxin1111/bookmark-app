@@ -110,6 +110,10 @@ type BookmarkStoreApi = {
     toCategoryId: string,
     overSiteId?: string,
   ): Promise<BookmarkCategory[]>;
+  /**
+   * onDidChange 订阅主进程广播的书签数据变更。
+   */
+  onDidChange(listener: (categories: BookmarkCategory[]) => void): () => void;
 };
 
 type BookmarkMetadataApi = {

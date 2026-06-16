@@ -55,6 +55,7 @@ let trayMouseDownTimer: ReturnType<typeof setTimeout> | null = null;
 let trayAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
 let isTrayMenuOpen = false;
 let lastTrayMenuClosedAt = 0;
+const bookmarkStoreDidChangeChannel = "bookmark-store:did-change";
 
 function clamp(value: number, min: number, max: number) {
   if (max < min) {
@@ -173,6 +174,16 @@ async function updateTrayIndicator() {
   if (process.platform === "darwin") {
     tray.setTitle(favoriteCount > 0 ? String(favoriteCount) : "");
   }
+}
+
+function broadcastBookmarkStoreChange(categories: BookmarkCategory[]) {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    if (window.isDestroyed()) {
+      return;
+    }
+
+    window.webContents.send(bookmarkStoreDidChangeChannel, categories);
+  });
 }
 
 function markTrayMouseDown() {
@@ -376,6 +387,7 @@ function registerBookmarkStoreIpc() {
   ) => {
     const nextCategories = await updater();
     await updateTrayIndicator();
+    broadcastBookmarkStoreChange(nextCategories);
     return nextCategories;
   };
 
